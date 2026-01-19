@@ -167,11 +167,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="include\archive_writer.cpp" />
     <ClCompile Include="src\archive_file.cpp" />
     <ClCompile Include="src\archive_reader.cpp" />
     <ClCompile Include="src\memory_mapped_file.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\archive_common.hpp" />
+    <ClInclude Include="include\archive_writer.hpp" />
     <ClInclude Include="include\Reverge Package File Library.h" />
     <ClInclude Include="include\archive_exception.hpp" />
     <ClInclude Include="include\archive_file.hpp" />

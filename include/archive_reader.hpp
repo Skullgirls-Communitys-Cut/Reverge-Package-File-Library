@@ -1,7 +1,4 @@
 #pragma once
-#include "memory_mapped_file.hpp"
-#include "archive_file.hpp"
-#include "archive_exception.hpp"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -10,6 +7,11 @@
 #include <string_view>
 #include <span>
 
+#include "memory_mapped_file.hpp"
+#include "archive_file.hpp"
+#include "archive_exception.hpp"
+#include "archive_common.hpp"
+
 namespace RPFL {
 
     class ArchiveReader {
@@ -17,7 +19,9 @@ namespace RPFL {
         struct Config {
             std::size_t cache_threshold = 1024 * 1024; // 1MB
             bool lazy_load = true;
+            bool allow_streaming = true;
             MemoryMappedFile::Options mmap_options = {};
+            Endianness file_endianness = Endianness::Big;
         };
 
         ArchiveReader() = default;
@@ -25,15 +29,16 @@ namespace RPFL {
             Config config = {});
         ~ArchiveReader();
 
-        // Открытие/закрытие
+        // opening and closing
         void open(const std::string& filepath, Config config = {});
         void close();
         bool is_open() const noexcept;
 
-        // Информация об архиве
+        // Information about Archive
         std::string_view identifier() const noexcept;
         std::string_view version() const noexcept;
         std::size_t file_count() const noexcept;
+        Endianness endianness() const noexcept { return config_.file_endianness; }
 
         // Работа с файлами
         ArchiveFile& get_file(const std::string& path);
@@ -68,6 +73,9 @@ namespace RPFL {
         std::unordered_map<std::string_view, ArchiveFile*> file_map_;
         Config config_;
         bool is_open_ = false;
+
+        friend class ArchiveWriter; // Для доступа к внутренней структуре
     };
+
 
 } // namespace RPFL

@@ -24,6 +24,9 @@
     <ClCompile Include="src\archive_file.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="include\archive_writer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Reverge Package File Library.h">
@@ -39,6 +42,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\memory_mapped_file.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\archive_common.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\archive_writer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

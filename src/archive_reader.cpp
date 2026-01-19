@@ -1,4 +1,3 @@
-#include "archive_reader.hpp"
 #include <cstring>
 #include <algorithm>
 #include <format>
@@ -7,15 +6,7 @@
 #include <ranges>
 #include <type_traits>
 
-template<std::integral T>
-constexpr T byteswap(T value) noexcept
-{
-    static_assert(std::has_unique_object_representations_v<T>,
-        "T may not have padding bits");
-    auto value_representation = std::bit_cast<std::array<std::byte, sizeof(T)>>(value);
-    std::ranges::reverse(value_representation);
-    return std::bit_cast<T>(value_representation);
-}
+#include "archive_reader.hpp"
 
 namespace RPFL {
 
@@ -66,19 +57,16 @@ namespace RPFL {
         const std::byte* ptr = data.data();
 
         // data_offset
-        std::memcpy(&header_.data_offset, ptr, sizeof(header_.data_offset));
-        header_.data_offset = byteswap(header_.data_offset); // Endian issue
+        header_.data_offset = read_with_endianness<std::uint32_t>(ptr, config_.file_endianness);
         ptr += sizeof(header_.data_offset);
 
-        // Проверяем, что есть место для идентификатора
+        // check have we place for indeficator
         if (static_cast<std::size_t>(ptr - data.data()) + 8 > data.size()) {
             throw ArchiveFormatException("Incomplete identifier length");
         }
 
         // file_identifier_length
-        std::uint64_t ident_length;
-        std::memcpy(&ident_length, ptr, sizeof(ident_length));
-        ident_length = byteswap(ident_length); // Endian issue
+        std::uint64_t ident_length = read_with_endianness<std::uint64_t>(ptr, config_.file_endianness);
         ptr += sizeof(ident_length);
 
         if (static_cast<std::size_t>(ptr - data.data()) + ident_length > data.size()) {
@@ -93,9 +81,7 @@ namespace RPFL {
             throw ArchiveFormatException("Incomplete version length");
         }
 
-        std::uint64_t version_length;
-        std::memcpy(&version_length, ptr, sizeof(version_length));
-        version_length = byteswap(version_length); // Endian issue
+        std::uint64_t version_length = read_with_endianness<std::uint64_t>(ptr, config_.file_endianness);
         ptr += sizeof(version_length);
 
         if (static_cast<std::size_t>(ptr - data.data()) + version_length > data.size()) {
@@ -117,9 +103,7 @@ namespace RPFL {
             + header_.version.size();
 
         // n_of_files
-        std::uint64_t num_files;
-        std::memcpy(&num_files, ptr, sizeof(num_files));
-        num_files = byteswap(num_files); // Endian issue
+        std::uint64_t num_files = read_with_endianness<std::uint64_t>(ptr, config_.file_endianness);
         ptr += sizeof(num_files);
 
         std::uint64_t current_offset = data_offset;
@@ -130,9 +114,7 @@ namespace RPFL {
                 throw ArchiveFormatException("Incomplete file path length");
             }
 
-            std::uint64_t path_length;
-            std::memcpy(&path_length, ptr, sizeof(path_length));
-            path_length = byteswap(path_length); // Endian issue
+            std::uint64_t path_length = read_with_endianness<std::uint64_t>(ptr, config_.file_endianness);
             ptr += sizeof(path_length);
 
             if (static_cast<std::size_t>(ptr - data.data()) + path_length > data.size()) {
@@ -147,13 +129,17 @@ namespace RPFL {
                 throw ArchiveFormatException("Incomplete file length");
             }
 
-            std::uint64_t file_size;
-            std::memcpy(&file_size, ptr, sizeof(file_size));
-            file_size = byteswap(file_size); // Endian issue
+            std::uint64_t file_size = read_with_endianness<std::uint64_t>(ptr, config_.file_endianness);
             ptr += sizeof(file_size);
 
-            // file_align (ignoring for)
-            ptr += sizeof(uint32_t);
+            // file_align
+            std::uint32_t file_align = read_with_endianness<std::uint32_t>(ptr, config_.file_endianness);
+            ptr += sizeof(file_align);
+
+            // Выравнивание
+            if (file_align > 1) {
+                current_offset = (current_offset + file_align - 1) & ~(file_align - 1);
+            }
 
             // Check that file data not extends beyond archive
             if (current_offset + file_size > data.size()) {
@@ -163,7 +149,8 @@ namespace RPFL {
 
             auto archive_file = std::make_unique<ArchiveFile>(
                 file_path, current_offset, file_size,
-                data.data(), config_.cache_threshold);
+                data.data(), config_.cache_threshold,
+                config_.allow_streaming);
 
             file_map_[archive_file->path()] = archive_file.get();
             files_.push_back(std::move(archive_file));

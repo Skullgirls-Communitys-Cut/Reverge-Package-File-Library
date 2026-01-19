@@ -5,7 +5,6 @@
 #include <span>
 #include <system_error>
 
-
 namespace RPFL {
 
     class MemoryMappedFile {
@@ -44,9 +43,20 @@ namespace RPFL {
             return { mapped_data_, mapped_size_ };
         }
 
+        // Добавляем методы для записи (только если не read_only)
+        std::span<std::byte> writable_data() {
+            if (options_.read_only) {
+                throw std::runtime_error("File opened in read-only mode");
+            }
+            return { mapped_data_, mapped_size_ };
+        }
+
         bool is_range_valid(std::size_t offset, std::size_t size) const noexcept {
             return offset <= mapped_size_ && (offset + size) <= mapped_size_;
         }
+
+        // Метод для изменения размера файла (реализовать только для записи)
+        void resize(std::size_t new_size);
 
     private:
 #ifdef _WIN32
@@ -60,4 +70,4 @@ namespace RPFL {
         Options options_;
     };
 
-} // namespace archive
+} // namespace RPFL
