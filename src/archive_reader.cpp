@@ -138,7 +138,7 @@ namespace RPFL {
 
             // Выравнивание
             if (file_align > 1) {
-                current_offset = (current_offset + file_align - 1) & ~(file_align - 1);
+                current_offset = (current_offset + file_align - 1) & ~(static_cast<unsigned long long>(file_align) - 1);
             }
 
             // Check that file data not extends beyond archive
