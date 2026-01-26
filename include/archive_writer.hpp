@@ -19,19 +19,16 @@ namespace RPFL {
         struct FileEntry {
             std::string path;
             std::vector<std::byte> data;
-            std::uint32_t align = 1; // file_aligned? (1 = нет выравнивания)
-            std::uint64_t offset = 0; // offset in archive (calc via writing)
+            std::uint32_t align = 1; // выравнивание файла (1 = без выравнивания)
+            std::uint64_t offset = 0; // смещение в архиве (вычисляется при записи)
         };
 
-        struct Config {
-            std::string identifier = "Reverge Package File";
-            std::string version = "1.1";
-            Endianness endianness = Endianness::Big;
-            std::uint32_t default_alignment = 1;
-        };
-
-        ArchiveWriter() = default;
-        explicit ArchiveWriter(Config config = {});
+        ArchiveWriter(
+            std::string identifier = "Reverge Package File",
+            std::string version = "1.1",
+            Endianness endianness = Endianness::Big,
+            std::uint32_t default_alignment = 1
+        );
 
         // Добавление файлов
         void add_file(const std::string& path, std::span<const std::byte> data,
@@ -45,30 +42,27 @@ namespace RPFL {
             add_file(path, std::span<const std::byte>(data, N), alignment);
         }
 
-        // Adding a new file from std::array<std::byte, N>
         template<std::size_t N>
         void add_file(const std::string& path, const std::array<std::byte, N>& data,
             std::uint32_t alignment = 0) {
             add_file(path, std::span<const std::byte>(data.data(), N), alignment);
         }
 
-        // Adding a new file from std::vector<std::byte>
         void add_file(const std::string& path, const std::vector<std::byte>& data,
             std::uint32_t alignment = 0) {
             add_file(path, std::span<const std::byte>(data.data(), data.size()), alignment);
         }
 
-        // Adding a new file from pointer + we need size
         void add_file(const std::string& path, const std::byte* data, std::size_t size,
             std::uint32_t alignment = 0) {
             add_file(path, std::span<const std::byte>(data, size), alignment);
         }
 
-        // Adding a new file from disk
+        // Добавление файла с диска
         bool add_file_from_disk(const std::filesystem::path& filepath,
             const std::string& archive_path = "",
             std::uint32_t alignment = 0);
-        
+
         // Удаление файлов
         bool remove_file(const std::string& path);
         void clear();
@@ -83,7 +77,7 @@ namespace RPFL {
         void write(std::ostream& stream);
         std::vector<std::byte> write_to_memory();
 
-        // Batch операции
+        // Пакетные операции
         void add_files_from_directory(const std::filesystem::path& dir,
             const std::string& prefix = "",
             std::function<bool(const std::filesystem::path&)> filter = nullptr);
@@ -91,8 +85,17 @@ namespace RPFL {
         // Модификация файлов
         bool update_file(const std::string& path, std::span<const std::byte> new_data);
 
+        // Установка параметров
+        void set_identifier(const std::string& identifier) { identifier_ = identifier; }
+        void set_version(const std::string& version) { version_ = version; }
+        void set_endianness(Endianness endianness) { endianness_ = endianness; }
+        void set_default_alignment(std::uint32_t alignment) { default_alignment_ = alignment; }
+
     private:
-        Config config_;
+        std::string identifier_ = "Reverge Package File";
+        std::string version_ = "1.1";
+        Endianness endianness_ = Endianness::Big;
+        std::uint32_t default_alignment_ = 1;
         std::unordered_map<std::string, FileEntry> files_;
 
         std::uint64_t calculate_header_size() const;

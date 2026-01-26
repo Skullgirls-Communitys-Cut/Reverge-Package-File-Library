@@ -6,11 +6,7 @@ int main() {
     //Reading
     std::cout << "Reading" << "\n";
     try {
-        RPFL::ArchiveReader::Config config;
-        config.cache_threshold = 2 * 1024 * 1024; // 2MB caching threshold. Standart it's a 1MB
-        config.mmap_options.prefetch = true; //Optional preload. Works only on POSIX.
-
-        RPFL::ArchiveReader archive("ReadTest.gfs", config);
+        RPFL::ArchiveReader archive("ReadTest.gfs");
 
         //Reading Header
         std::cout << "Header:" << "\n";
@@ -87,12 +83,7 @@ int main() {
     std::cout << "Writing" << "\n";
     try
     {
-        RPFL::ArchiveWriter::Config config;
-
-        config.identifier = "Reverge Package File"; //Standart value, but you can change this
-        config.version = "1.1"; //Standart value
-
-        RPFL::ArchiveWriter writer(config);
+        RPFL::ArchiveWriter writer;
 
         //Method 1:
         //You can add data like a string. If you're using char[] instead, be sure that C-style string have zero-terminator

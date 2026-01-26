@@ -5,7 +5,16 @@
 
 namespace RPFL {
 
-    ArchiveWriter::ArchiveWriter(Config config) : config_(std::move(config)) {}
+    ArchiveWriter::ArchiveWriter(
+        std::string identifier,
+        std::string version,
+        Endianness endianness,
+        std::uint32_t default_alignment
+    ) : identifier_(std::move(identifier)),
+        version_(std::move(version)),
+        endianness_(endianness),
+        default_alignment_(default_alignment) {
+    }
 
     void ArchiveWriter::add_file(const std::string& path, std::span<const std::byte> data,
         std::uint32_t alignment) {
@@ -20,7 +29,7 @@ namespace RPFL {
         FileEntry entry;
         entry.path = path;
         entry.data.assign(data.begin(), data.end());
-        entry.align = alignment > 0 ? alignment : config_.default_alignment;
+        entry.align = alignment > 0 ? alignment : default_alignment_;
 
         files_[path] = std::move(entry);
     }
@@ -85,10 +94,10 @@ namespace RPFL {
         size += sizeof(std::uint32_t);
 
         // identifier length + identifier
-        size += sizeof(std::uint64_t) + config_.identifier.size();
+        size += sizeof(std::uint64_t) + identifier_.size();
 
         // version length + version
-        size += sizeof(std::uint64_t) + config_.version.size();
+        size += sizeof(std::uint64_t) + version_.size();
 
         // number of files
         size += sizeof(std::uint64_t);
@@ -108,26 +117,26 @@ namespace RPFL {
         std::uint64_t header_size = calculate_header_size();
 
         // Write data_offset (начало данных файлов)
-        write_with_endianness(buffer + offset, static_cast<std::uint32_t>(header_size), config_.endianness);
+        write_with_endianness(buffer + offset, static_cast<std::uint32_t>(header_size), endianness_);
         offset += sizeof(std::uint32_t);
 
         // Write identifier
-        std::uint64_t ident_length = config_.identifier.size();
-        write_with_endianness(buffer + offset, ident_length, config_.endianness);
+        std::uint64_t ident_length = identifier_.size();
+        write_with_endianness(buffer + offset, ident_length, endianness_);
         offset += sizeof(ident_length);
-        std::memcpy(buffer + offset, config_.identifier.data(), ident_length);
+        std::memcpy(buffer + offset, identifier_.data(), ident_length);
         offset += ident_length;
 
         // Write version
-        std::uint64_t version_length = config_.version.size();
-        write_with_endianness(buffer + offset, version_length, config_.endianness);
+        std::uint64_t version_length = version_.size();
+        write_with_endianness(buffer + offset, version_length, endianness_);
         offset += sizeof(version_length);
-        std::memcpy(buffer + offset, config_.version.data(), version_length);
+        std::memcpy(buffer + offset, version_.data(), version_length);
         offset += version_length;
 
         // Write number of files
         std::uint64_t num_files = files_.size();
-        write_with_endianness(buffer + offset, num_files, config_.endianness);
+        write_with_endianness(buffer + offset, num_files, endianness_);
         offset += sizeof(num_files);
     }
 
@@ -135,18 +144,18 @@ namespace RPFL {
         for (const auto& [path, entry] : files_) {
             // Write path length and path
             std::uint64_t path_length = path.size();
-            write_with_endianness(buffer + offset, path_length, config_.endianness);
+            write_with_endianness(buffer + offset, path_length, endianness_);
             offset += sizeof(path_length);
             std::memcpy(buffer + offset, path.data(), path_length);
             offset += path_length;
 
             // Write file size
             std::uint64_t file_size = entry.data.size();
-            write_with_endianness(buffer + offset, file_size, config_.endianness);
+            write_with_endianness(buffer + offset, file_size, endianness_);
             offset += sizeof(file_size);
 
             // Write alignment
-            write_with_endianness(buffer + offset, entry.align, config_.endianness);
+            write_with_endianness(buffer + offset, entry.align, endianness_);
             offset += sizeof(entry.align);
         }
     }

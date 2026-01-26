@@ -10,21 +10,42 @@
 
 namespace RPFL {
 
-    ArchiveReader::ArchiveReader(const std::string& filepath, Config config)
-        : config_(std::move(config)) {
-        open(filepath, config_);
+    ArchiveReader::ArchiveReader(
+        const std::string& filepath,
+        std::size_t cache_threshold,
+        bool lazy_load,
+        bool allow_streaming,
+        MemoryMappedFile::Options mmap_options,
+        Endianness file_endianness
+    ) : cache_threshold_(cache_threshold),
+        lazy_load_(lazy_load),
+        allow_streaming_(allow_streaming),
+        mmap_options_(std::move(mmap_options)),
+        file_endianness_(file_endianness) {
+        open(filepath, cache_threshold_, lazy_load_, allow_streaming_, mmap_options_, file_endianness_);
     }
 
     ArchiveReader::~ArchiveReader() {
         close();
     }
 
-    void ArchiveReader::open(const std::string& filepath, Config config) {
+    void ArchiveReader::open(
+        const std::string& filepath,
+        std::size_t cache_threshold,
+        bool lazy_load,
+        bool allow_streaming,
+        MemoryMappedFile::Options mmap_options,
+        Endianness file_endianness
+    ) {
         close();
-        config_ = std::move(config);
+        cache_threshold_ = cache_threshold;
+        lazy_load_ = lazy_load;
+        allow_streaming_ = allow_streaming;
+        mmap_options_ = std::move(mmap_options);
+        file_endianness_ = file_endianness;
 
         try {
-            mmap_file_.open(filepath, config_.mmap_options);
+            mmap_file_.open(filepath, mmap_options_);
             auto data = mmap_file_.data();
 
             parse_header(data);
@@ -57,16 +78,16 @@ namespace RPFL {
         const std::byte* ptr = data.data();
 
         // data_offset
-        header_.data_offset = read_with_endianness<std::uint32_t>(ptr, config_.file_endianness);
+        header_.data_offset = read_with_endianness<std::uint32_t>(ptr, file_endianness_);
         ptr += sizeof(header_.data_offset);
 
-        // check have we place for indeficator
+        // Проверяем, есть ли место для идентификатора
         if (static_cast<std::size_t>(ptr - data.data()) + 8 > data.size()) {
             throw ArchiveFormatException("Incomplete identifier length");
         }
 
         // file_identifier_length
-        std::uint64_t ident_length = read_with_endianness<std::uint64_t>(ptr, config_.file_endianness);
+        std::uint64_t ident_length = read_with_endianness<std::uint64_t>(ptr, file_endianness_);
         ptr += sizeof(ident_length);
 
         if (static_cast<std::size_t>(ptr - data.data()) + ident_length > data.size()) {
@@ -81,7 +102,7 @@ namespace RPFL {
             throw ArchiveFormatException("Incomplete version length");
         }
 
-        std::uint64_t version_length = read_with_endianness<std::uint64_t>(ptr, config_.file_endianness);
+        std::uint64_t version_length = read_with_endianness<std::uint64_t>(ptr, file_endianness_);
         ptr += sizeof(version_length);
 
         if (static_cast<std::size_t>(ptr - data.data()) + version_length > data.size()) {
@@ -95,15 +116,15 @@ namespace RPFL {
     void ArchiveReader::parse_file_table(std::span<const std::byte> data,
         std::uint32_t data_offset) {
         const std::byte* ptr =
-            data.data() //Pointer
+            data.data() // Указатель
             + sizeof(data_offset)
-            + sizeof(uint64_t) //header.identifier lenght
+            + sizeof(uint64_t) // header.identifier length
             + header_.identifier.size()
-            + 8 //header.version lenght
+            + 8 // header.version length
             + header_.version.size();
 
         // n_of_files
-        std::uint64_t num_files = read_with_endianness<std::uint64_t>(ptr, config_.file_endianness);
+        std::uint64_t num_files = read_with_endianness<std::uint64_t>(ptr, file_endianness_);
         ptr += sizeof(num_files);
 
         std::uint64_t current_offset = data_offset;
@@ -114,7 +135,7 @@ namespace RPFL {
                 throw ArchiveFormatException("Incomplete file path length");
             }
 
-            std::uint64_t path_length = read_with_endianness<std::uint64_t>(ptr, config_.file_endianness);
+            std::uint64_t path_length = read_with_endianness<std::uint64_t>(ptr, file_endianness_);
             ptr += sizeof(path_length);
 
             if (static_cast<std::size_t>(ptr - data.data()) + path_length > data.size()) {
@@ -129,11 +150,11 @@ namespace RPFL {
                 throw ArchiveFormatException("Incomplete file length");
             }
 
-            std::uint64_t file_size = read_with_endianness<std::uint64_t>(ptr, config_.file_endianness);
+            std::uint64_t file_size = read_with_endianness<std::uint64_t>(ptr, file_endianness_);
             ptr += sizeof(file_size);
 
             // file_align
-            std::uint32_t file_align = read_with_endianness<std::uint32_t>(ptr, config_.file_endianness);
+            std::uint32_t file_align = read_with_endianness<std::uint32_t>(ptr, file_endianness_);
             ptr += sizeof(file_align);
 
             // Выравнивание
@@ -141,7 +162,7 @@ namespace RPFL {
                 current_offset = (current_offset + file_align - 1) & ~(file_align - 1);
             }
 
-            // Check that file data not extends beyond archive
+            // Проверяем, что данные файла не выходят за пределы архива
             if (current_offset + file_size > data.size()) {
                 throw ArchiveFormatException(
                     std::format("File '{}' extends beyond archive", file_path));
@@ -149,8 +170,8 @@ namespace RPFL {
 
             auto archive_file = std::make_unique<ArchiveFile>(
                 file_path, current_offset, file_size,
-                data.data(), config_.cache_threshold,
-                config_.allow_streaming);
+                data.data(), cache_threshold_,
+                allow_streaming_);
 
             file_map_[archive_file->path()] = archive_file.get();
             files_.push_back(std::move(archive_file));
